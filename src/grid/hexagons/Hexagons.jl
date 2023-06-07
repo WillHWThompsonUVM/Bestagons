@@ -1,0 +1,182 @@
+using DrWatson
+
+# Here you may include files from the source directory
+
+
+abstract type Hexagon end
+
+struct HexagonAxial <: Hexagon
+    q::Int
+    r::Int
+end
+
+struct HexagonCubic <: Hexagon
+    x::Int
+    y::Int
+    z::Int
+end
+
+struct HexagonOffsetOddR <: Hexagon
+    q::Int
+    r::Int
+end
+
+struct HexagonOffsetEvenR <: Hexagon
+
+    q::Int
+    r::Int
+end
+
+
+
+#Constructors
+hexagon(x::Int, y::Int, z::Int) = HexagonCubic(x, y, z)
+hexagon(q::Int, r::Int) = HexagonAxial(q, r)
+
+
+
+# Convert between hexagon indexing
+# # --------------------------------
+
+function convert(::Type{HexagonAxial}, hex::HexagonCubic)
+    HexagonAxial(hex.x, hex.z)
+end
+
+
+function convert(::Type{HexagonCubic}, hex::HexagonAxial)
+        HexagonCubic(hex.q, hex.r, -hex.q - hex.r)
+    end
+
+
+# Neighbor hexagon iterator
+# # -------------------------
+#
+struct HexagonNeighborIterator
+     hex::HexagonCubic
+end
+
+const CUBIC_HEX_NEIGHBOR_OFFSETS = [
+                                    1 -1  0;
+                                    1  0 -1;
+                                    0  1 -1;
+                                    -1  1  0;
+                                    -1  0  1;
+                                    0 -1  1;
+                                   ]
+
+
+function iterate(it::HexagonNeighborIterator, state=1)
+    state > 6 && return nothing
+    dx = CUBIC_HEX_NEIGHBOR_OFFSETS[state, 1]
+    dy = CUBIC_HEX_NEIGHBOR_OFFSETS[state, 2]
+    dz = CUBIC_HEX_NEIGHBOR_OFFSETS[state, 3]
+    neighbor = HexagonCubic(it.hex.x + dx, it.hex.y + dy, it.hex.z + dz)
+    return (neighbor, state + 1)
+end
+
+
+
+
+neighbors(hex::Hexagon) = HexagonNeighborIterator(convert(HexagonCubic, hex))
+
+length(::HexagonNeighborIterator) = 6
+# Diagonal hexagon iterator
+# # -------------------------
+#
+struct HexagonDiagonalIterator
+    hex::HexagonCubic
+end
+
+const CUBIC_HEX_DIAGONAL_OFFSETS = [
+                                    +2 -1 -1;
+                                    +1 +1 -2;
+                                    -1 +2 -1;
+                                    -2 +1 +1;
+                                    -1 -1 +2;
+                                    +1 -2 +1;
+                                   ]
+
+diagonals(hex::Hexagon) = HexagonDiagonalIterator(convert(HexagonCubic, hex))
+
+length(::HexagonDiagonalIterator) = 6
+
+function iterate(it::HexagonDiagonalIterator, state=1)
+    state > 6 && return nothing
+    dx = CUBIC_HEX_DIAGONAL_OFFSETS[state, 1]
+    dy = CUBIC_HEX_DIAGONAL_OFFSETS[state, 2]
+    dz = CUBIC_HEX_DIAGONAL_OFFSETS[state, 3]
+    diagonal = HexagonCubic(it.hex.x + dx, it.hex.y + dy, it.hex.z + dz)
+    return (diagonal, state + 1)
+end
+
+# Iterator over the vertices of a hexagon
+# ---------------------------------------
+
+ struct HexagonVertexIterator
+     x_center::Float64
+     y_center::Float64
+     xsize::Float64
+     ysize::Float64
+
+     function HexagonVertexIterator(x, y, xsize=1.0, ysize=1.0)
+         new((Float64(x)), (Float64(y)),
+             (Float64(xsize)), (Float64(ysize)))
+     end
+
+     function HexagonVertexIterator(hex::Hexagon,
+             xsize=1.0, ysize=1.0, xoff=0.0, yoff=0.0)
+         c = center(hex, xsize, ysize, xoff, yoff)
+         new((Float64(c[1])), (Float64(c[2])),
+             (Float64(xsize)), (Float64(ysize)))
+     end
+ end
+
+ function vertices(hex::Hexagon, xsize=1.0, ysize=1.0, xoff=0.0, yoff=0.0)
+     c = center(hex, xsize, ysize, xoff, yoff)
+     HexagonVertexIterator(c[1], c[2], xsize, ysize)
+ end
+
+ # TODO: remove this function?
+ function hexpoints(x, y, xsize=1.0, ysize=1.0)
+     collect(Tuple{Float64, Float64},
+             HexagonVertexIterator(Float64(x), Float64(y),
+                                   Float64(xsize), Float64(ysize)))
+ end
+
+ length(::HexagonVertexIterator) = 6
+
+ function iterate(it::HexagonVertexIterator, state=1)
+     state > 6 && return nothing
+     theta = 2*pi/6 * (state-1+0.5)
+     x_i = it.x_center + it.xsize * cos(theta)
+     y_i = it.y_center + it.ysize * sin(theta)
+     return ((x_i, y_i), state + 1)
+ end
+
+
+
+
+ # Utilities 
+ #--------
+
+
+# function center(hex::Hexagon, xsize::Float64=1.0, ysize::Float64=1.0, xoff::Float64=0.0, yoff::Float64=0.0)
+#         axh = convert(HexagonAxial, hex)
+#             (xoff + xsize * sqrt(3) * (axh.q + axh.r/2), yoff + ysize * (3/2) * axh.r)
+#         end
+#
+#function center(hex::Hexagon,size::Float64=1.0, xoff::Float64=0.0, yoff::Float64=0.0)
+#         axh = convert(HexagonAxial, hex)
+#         mat = [sqrt(3) sqrt(3)/2; 0 3/2]
+#         size*mat*[hex.q;hex.r]+[xoff;yoff]
+#         end
+ function center(hex::Hexagon, xsize::Float64, ysize::Float64, xoff::Float64, yoff::Float64)
+         axh = convert(HexagonAxial, hex)
+             (xoff + xsize * sqrt(3) * (axh.q + axh.r/2), yoff + ysize * (3/2) * axh.r)
+         end
+
+function center(hex::Hexagon,size::Float64, xoff::Float64, yoff::Float64)
+         axh = convert(HexagonAxial, hex)
+         mat = [sqrt(3) sqrt(3)/2; 0 3/2]
+         size*mat*[hex.q;hex.r]+[xoff;yoff]
+         end

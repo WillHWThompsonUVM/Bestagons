@@ -1,0 +1,9 @@
+name = "Bestagons"
+uuid = "ba72029f-2f7e-4c06-9bd6-e0a15c10c192"
+authors = ["WillHWThompson <will.w.thompon@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+DrWatson = "634d3b9d-ee7a-5ddf-bec9-22491ea816e1"
+Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
